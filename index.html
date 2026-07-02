@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Composable CDP — Package Builder & Cost Estimator</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter','Segoe UI',sans-serif; background: #F7F9FD; color: #0B1221; min-height: 100vh; }
+button { font-family: inherit; cursor: pointer; }
+input { font-family: inherit; }
+
+/* ── TOPBAR ── */
+.topbar { background:#fff; border-bottom:1px solid #E5EAF2; padding:0 32px; position:sticky; top:0; z-index:90; }
+.topbar-inner { max-width:1240px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; height:64px; }
+.logo-row { display:flex; align-items:center; gap:10px; }
+.logo-text { font-size:15px; font-weight:700; color:#0B1221; }
+.logo-sub { font-size:12px; color:#6B7591; }
+.badge { background:#004BFF; color:#fff; font-size:13px; font-weight:600; padding:6px 16px; border-radius:20px; }
+.count-label { font-size:13px; color:#6B7591; }
+
+/* ── STEPPER ── */
+.stepper { max-width:1240px; margin:0 auto; padding:28px 32px 0; display:flex; align-items:center; gap:0; }
+.step-pill { display:flex; align-items:center; gap:10px; }
+.step-pill .num { width:30px; height:30px; border-radius:50%; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.step-pill.active .num { background:#004BFF; color:#fff; }
+.step-pill.done .num { background:#11875A; color:#fff; }
+.step-pill.inactive .num { background:#E5EAF2; color:#949DB5; }
+.step-pill .label { font-size:13px; font-weight:600; }
+.step-pill.active .label { color:#004BFF; }
+.step-pill.done .label { color:#11875A; }
+.step-pill.inactive .label { color:#949DB5; }
+.step-connector { flex:1; height:2px; background:#E5EAF2; margin:0 12px; max-width:80px; }
+.step-connector.done { background:#11875A; }
+
+/* ── MAIN ── */
+.main { max-width:1240px; margin:0 auto; padding:24px 32px 48px; display:grid; grid-template-columns:1fr 300px; gap:28px; align-items:start; }
+
+/* ── STEP PANELS ── */
+.step-panel { display:none; }
+.step-panel.visible { display:block; }
+
+/* ── SECTION HEADERS ── */
+.section-hd { display:flex; align-items:flex-start; gap:12px; margin-bottom:16px; }
+.step-num { width:28px; height:28px; border-radius:50%; background:#004BFF; color:#fff; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.step-title { font-size:20px; font-weight:700; color:#0B1221; margin-bottom:2px; }
+.step-sub { font-size:13px; color:#6B7591; }
+
+/* ── CALLOUT ── */
+.callout { background:#EEF2F9; border:1px solid #D2DAE8; border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:10px; margin-bottom:20px; font-size:13px; color:#2E3950; }
+
+/* ── GRID ── */
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+/* ── CORE CARD ── */
+.core-card { background:#fff; border:1.5px solid #B3CAFF; border-radius:12px; padding:16px; position:relative; }
+.core-badge { position:absolute; top:12px; right:12px; background:#E7F6EF; color:#11875A; font-size:11px; font-weight:600; padding:2px 10px; border-radius:20px; display:flex; align-items:center; gap:4px; }
+.card-icon { width:36px; height:36px; border-radius:10px; background:#EBF1FF; display:flex; align-items:center; justify-content:center; color:#004BFF; flex-shrink:0; }
+.card-icon.grey { background:#F4F7FC; color:#6B7591; }
+.card-row { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+.card-title { font-size:15px; font-weight:600; color:#0B1221; padding-right:60px; }
+.card-desc { font-size:13px; color:#4A5571; line-height:1.5; }
+.card-why { font-size:12px; color:#949DB5; font-style:italic; }
+.card-footer { display:flex; align-items:center; justify-content:space-between; margin-top:10px; }
+.learn-btn { background:none; border:none; color:#004BFF; font-size:12px; font-weight:500; display:flex; align-items:center; gap:4px; padding:0; }
+
+/* ── OPT-CORE CARD ── */
+.opt-core-card { background:#fff; border:1.5px solid #E5EAF2; border-radius:12px; padding:16px; cursor:pointer; transition:all 0.15s; margin-top:12px; }
+.opt-core-card.on { background:#EBF1FF; border-color:#004BFF; }
+.opt-core-hd { display:flex; align-items:center; justify-content:space-between; }
+.opt-core-left { display:flex; align-items:center; gap:10px; }
+.opt-core-right { display:flex; align-items:center; gap:8px; }
+.status-pill { font-size:11px; font-weight:600; padding:2px 10px; border-radius:20px; }
+.status-on { background:#D9E5FF; color:#003ACC; border:1px solid #B3CAFF; }
+.status-off { background:#EEF2F9; color:#6B7591; border:1px solid #D2DAE8; }
+
+/* ── SECTION DIVIDER ── */
+.sdiv { display:flex; align-items:center; gap:8px; margin-bottom:14px; margin-top:32px; }
+.sdot { width:10px; height:10px; border-radius:3px; border:1.5px solid #D2DAE8; flex-shrink:0; }
+.slabel { font-size:13px; font-weight:600; color:#4A5571; text-transform:uppercase; letter-spacing:0.07em; }
+.sline { flex:1; height:1px; background:#E5EAF2; }
+.scount { font-size:12px; color:#949DB5; }
+
+/* ── OPT CARD ── */
+.opt-card { background:#fff; border:1.5px solid #E5EAF2; border-radius:12px; padding:16px; cursor:pointer; transition:all 0.15s; position:relative; }
+.opt-card.on { background:#EBF1FF; border-color:#004BFF; }
+.opt-card:hover { border-color:#B3CAFF; }
+.opt-card.on:hover { border-color:#003ACC; }
+.opt-card-icon { width:36px; height:36px; border-radius:10px; background:#F4F7FC; display:flex; align-items:center; justify-content:center; color:#6B7591; flex-shrink:0; transition:all 0.15s; }
+.opt-card.on .opt-card-icon { background:#004BFF; color:#fff; }
+.opt-card-title { font-size:14px; font-weight:600; color:#0B1221; }
+.opt-card.on .opt-card-title { color:#002C9E; }
+.addon-pill { background:#E7E5F8; color:#004BFF; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; border:1px solid #D9E5FF; position:absolute; top:12px; right:12px; }
+.details-btn { background:none; border:none; color:#004BFF; font-size:12px; font-weight:500; display:flex; align-items:center; gap:4px; padding:0; margin-top:4px; }
+
+/* ── NEXT BUTTON ── */
+.next-btn-wrap { margin-top:28px; display:flex; align-items:center; justify-content:flex-end; gap:12px; }
+.next-btn { background:#004BFF; color:#fff; border:none; border-radius:10px; padding:12px 28px; font-size:15px; font-weight:600; display:flex; align-items:center; gap:8px; }
+.next-btn:hover { background:#003ACC; }
+.back-btn { background:#F4F7FC; color:#4A5571; border:1.5px solid #E5EAF2; border-radius:10px; padding:12px 20px; font-size:14px; font-weight:500; }
+.back-btn:hover { border-color:#004BFF; color:#004BFF; }
+
+/* ── SIDEBAR ── */
+.sidebar { background:#060B1A; border-radius:16px; padding:28px; color:#fff; position:sticky; top:88px; }
+.sb-hd { display:flex; align-items:center; gap:10px; margin-bottom:24px; }
+.sb-pkg-label { font-size:13px; color:#6B7EA8; font-weight:500; }
+.sb-total { font-size:18px; font-weight:700; }
+.sb-section { margin-bottom:20px; }
+.sb-sec-label { font-size:11px; font-weight:600; color:#6B7EA8; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px; }
+.sb-item { display:flex; align-items:center; gap:8px; font-size:13px; color:#C8D4EC; margin-bottom:6px; }
+.sb-divider { border:none; border-top:1px solid rgba(255,255,255,0.08); margin:20px 0; }
+.sb-step-label { font-size:11px; color:#6B7EA8; text-align:center; margin-bottom:10px; font-style:italic; }
+.export-btn { width:100%; background:#004BFF; color:#fff; border:none; border-radius:10px; padding:14px; font-size:15px; font-weight:600; }
+.export-btn:disabled { background:#2E3950; color:#6B7EA8; cursor:not-allowed; }
+.export-hint { text-align:center; font-size:12px; color:#6B7EA8; margin-top:12px; }
+.empty-state { background:rgba(255,255,255,0.04); border:1px dashed rgba(255,255,255,0.1); border-radius:10px; padding:14px; text-align:center; color:#6B7EA8; font-size:13px; }
+
+/* ── MODAL ── */
+.modal-backdrop { position:fixed; inset:0; background:rgba(11,18,33,0.5); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px; }
+.modal { background:#fff; border-radius:16px; max-width:520px; width:100%; padding:32px; position:relative; box-shadow:0 24px 60px rgba(0,75,255,0.12); max-height:85vh; overflow-y:auto; }
+.modal-close { position:absolute; top:16px; right:16px; background:#F4F7FC; border:none; border-radius:8px; width:32px; height:32px; display:flex; align-items:center; justify-content:center; color:#4A5571; font-size:18px; line-height:1; }
+.modal-icon-wrap { width:44px; height:44px; border-radius:12px; background:#EBF1FF; display:flex; align-items:center; justify-content:center; color:#004BFF; flex-shrink:0; }
+.modal-hd { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+.modal-title { font-size:18px; font-weight:700; color:#0B1221; }
+.modal-link { font-size:12px; color:#004BFF; text-decoration:none; }
+.modal-desc { font-size:15px; color:#2E3950; line-height:1.6; margin-bottom:20px; }
+.uc-label { font-size:12px; font-weight:600; color:#6B7591; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px; }
+.uc-item { display:flex; align-items:center; gap:8px; font-size:14px; color:#2E3950; margin-bottom:6px; }
+.c-green { color:#11875A; }
+.c-blue { color:#4D7DFF; }
+.c-purple { color:#A78BFA; }
+
+/* ── STEP 2: CALCULATOR ── */
+.calc-intro { background:#fff; border:1px solid #E5EAF2; border-radius:14px; padding:20px 24px; margin-bottom:24px; }
+.calc-intro p { font-size:14px; color:#4A5571; line-height:1.6; }
+.calc-section { background:#fff; border:1px solid #E5EAF2; border-radius:14px; padding:20px 24px; margin-bottom:16px; transition:opacity 0.2s, filter 0.2s; }
+.calc-section.disabled { opacity:0.38; pointer-events:none; filter:grayscale(0.3); }
+.calc-section-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.calc-section-title { display:flex; align-items:center; gap:10px; font-size:15px; font-weight:700; color:#0B1221; }
+.calc-section-icon { width:28px; height:28px; border-radius:8px; background:#EBF1FF; display:flex; align-items:center; justify-content:center; color:#004BFF; flex-shrink:0; }
+.calc-section-icon.amber { background:#FEF3C7; color:#B45309; }
+.calc-section-icon.purple { background:#EDE9FE; color:#7C3AED; }
+.calc-section-icon.grey { background:#F4F7FC; color:#6B7591; }
+.calc-reason { font-size:11px; color:#11875A; font-weight:600; background:#E7F6EF; padding:2px 10px; border-radius:20px; border:1px solid #B8E3CE; }
+.calc-reason.locked { color:#6B7591; background:#EEF2F9; border-color:#D2DAE8; }
+.disabled-reason { font-size:12px; color:#949DB5; font-style:italic; margin-top:4px; display:block; }
+.field { margin-bottom:16px; }
+.field:last-child { margin-bottom:0; }
+.field-row { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:6px; }
+.field-label { font-size:13px; font-weight:600; color:#0B1221; }
+.field-val { font-family:'JetBrains Mono','Courier New',monospace; font-size:12px; font-weight:600; color:#004BFF; background:#EBF1FF; padding:2px 8px; border-radius:6px; border:1px solid #B3CAFF; white-space:nowrap; }
+.field-hint { font-size:12px; color:#6B7591; line-height:1.4; margin-top:4px; }
+.pair { display:grid; grid-template-columns:1fr 100px; gap:10px; align-items:center; }
+input[type="range"] { -webkit-appearance:none; appearance:none; width:100%; height:6px; background:#E5EAF2; border-radius:999px; outline:none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:18px; height:18px; border-radius:50%; background:linear-gradient(135deg,#004BFF,#4D7DFF); cursor:pointer; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,75,255,0.3); }
+input[type="range"]::-moz-range-thumb { width:18px; height:18px; border-radius:50%; background:#004BFF; cursor:pointer; border:2px solid #fff; }
+input[type="number"] { width:100%; padding:8px 10px; background:#F4F7FC; border:1.5px solid #E5EAF2; border-radius:8px; color:#0B1221; font-size:13px; outline:none; }
+input[type="number"]:focus { border-color:#004BFF; box-shadow:0 0 0 3px #EBF1FF; background:#fff; }
+
+/* presets */
+.presets-bar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+.preset-btn { flex:1; min-width:100px; padding:8px 10px; border:1.5px solid #E5EAF2; border-radius:10px; background:#F4F7FC; color:#4A5571; font-size:12px; font-weight:600; text-align:center; transition:all 0.15s; }
+.preset-btn:hover { border-color:#004BFF; background:#EBF1FF; color:#004BFF; }
+.preset-btn.active { border-color:#004BFF; background:#EBF1FF; color:#004BFF; box-shadow:0 0 0 2px rgba(0,75,255,0.15); }
+.preset-sub { display:block; font-size:11px; font-weight:400; color:#949DB5; margin-top:2px; }
+.preset-btn.active .preset-sub { color:#6B99FF; }
+
+/* results */
+.result-card { background:linear-gradient(135deg,#004BFF 0%,#4D7DFF 100%); color:#fff; border-radius:14px; padding:24px; margin-bottom:16px; box-shadow:0 8px 28px rgba(0,75,255,0.25); }
+.result-card .rlabel { font-size:12px; font-weight:500; text-transform:uppercase; letter-spacing:0.08em; opacity:0.85; margin-bottom:6px; }
+.result-card .rvalue { font-size:42px; font-weight:700; letter-spacing:-0.02em; line-height:1; font-variant-numeric:tabular-nums; }
+.result-card .rsub { margin-top:14px; font-size:13px; opacity:0.9; display:flex; flex-wrap:wrap; gap:16px; }
+.breakdown-wrap { background:#fff; border:1px solid #E5EAF2; border-radius:14px; padding:20px 24px; margin-bottom:16px; }
+.bk-title { font-size:13px; font-weight:700; color:#0B1221; margin-bottom:14px; }
+.stacked-bar { display:flex; height:10px; border-radius:999px; overflow:hidden; background:#EEF2F9; margin-bottom:14px; }
+.stacked-bar > div { height:100%; transition:width 220ms ease; }
+.bk-table { width:100%; border-collapse:collapse; font-size:13px; }
+.bk-table th, .bk-table td { text-align:left; padding:8px 4px; border-bottom:1px solid #E5EAF2; }
+.bk-table th { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#6B7591; }
+.bk-table td.cost, .bk-table th.cost { text-align:right; font-family:'JetBrains Mono','Courier New',monospace; }
+.bk-table td.pct, .bk-table th.pct { text-align:right; color:#949DB5; font-size:12px; font-family:monospace; width:40px; }
+.bk-table .name { display:flex; align-items:center; gap:8px; font-weight:500; color:#0B1221; }
+.bk-table .swatch { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+.bk-table .detail { font-size:11px; color:#6B7591; margin-top:2px; font-family:monospace; }
+.bk-table tfoot td { padding-top:10px; font-weight:600; color:#0B1221; border-bottom:none; }
+.bk-table .disabled-row td { opacity:0.4; font-style:italic; }
+.metrics-wrap { background:#fff; border:1px solid #E5EAF2; border-radius:14px; padding:20px 24px; }
+.metrics-title { font-size:13px; font-weight:700; color:#0B1221; margin-bottom:12px; }
+.kv { display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px dashed #E5EAF2; font-size:13px; }
+.kv:last-child { border-bottom:none; }
+.kv .k { color:#4A5571; }
+.kv .v { font-family:monospace; font-weight:600; color:#0B1221; }
+.kv.dim .k, .kv.dim .v { color:#949DB5; }
+
+/* ── ADVANCED SETTINGS ── */
+.adv-details { margin-top:16px; }
+.adv-details summary {
+  display:flex; align-items:center; gap:8px;
+  font-size:13px; font-weight:600; color:#4A5571;
+  cursor:pointer; padding:14px 20px;
+  background:#F4F7FC; border:1.5px solid #E5EAF2;
+  border-radius:12px; list-style:none; user-select:none;
+  transition:all 0.15s;
+}
+.adv-details summary::-webkit-details-marker { display:none; }
+.adv-details summary:hover { background:#EBF1FF; border-color:#B3CAFF; color:#004BFF; }
+.adv-details[open] summary { border-radius:12px 12px 0 0; border-bottom-color:transparent; background:#EBF1FF; color:#004BFF; border-color:#B3CAFF; }
+.adv-details summary .adv-chevron { margin-left:auto; transition:transform 0.2s; }
+.adv-details[open] summary .adv-chevron { transform:rotate(90deg); }
+.adv-body {
+  background:#fff; border:1.5px solid #B3CAFF; border-top:none;
+  border-radius:0 0 12px 12px; padding:20px 20px 24px;
+}
+.adv-group { margin-bottom:20px; }
+.adv-group:last-child { margin-bottom:0; }
+.adv-group-title {
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
+  color:#6B7591; margin-bottom:12px; padding-bottom:6px;
+  border-bottom:1px dashed #E5EAF2; display:flex; align-items:center; gap:6px;
+}
+.adv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }
+.adv-field { display:flex; flex-direction:column; gap:4px; }
+.adv-field label { font-size:12px; font-weight:500; color:#4A5571; }
+.adv-field input[type="number"] {
+  padding:7px 10px; background:#F4F7FC; border:1.5px solid #E5EAF2;
+  border-radius:8px; color:#0B1221; font-size:12px; font-family:monospace; outline:none;
+}
+.adv-field input[type="number"]:focus { border-color:#004BFF; box-shadow:0 0 0 3px #EBF1FF; background:#fff; }
+.adv-reset { margin-top:16px; padding:8px 16px; background:#fff; color:#004BFF; border:1.5px solid #B3CAFF; border-radius:8px; font-size:13px; font-weight:500; transition:all 0.15s; }
+.adv-reset:hover { background:#EBF1FF; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="logo-row">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 471.44 449.27" width="28" height="28">
+        <path fill="#004BFF" d="M299.39,89.07c-8.87-9.68-21.43-15.15-34.56-15.15h-58.22c-13.13,0-25.69,5.47-34.56,15.15-42.45,46.31-76.02,104.46-94.9,164.37-3.95,12.52-2.4,26.13,4.16,37.5,10.35,17.93,18.76,32.49,29.11,50.42,6.56,11.37,17.58,19.51,30.4,22.36,61.33,13.6,128.47,13.6,189.8,0,12.82-2.84,23.83-10.99,30.4-22.36,10.35-17.93,18.76-32.49,29.11-50.42,6.56-11.37,8.11-24.98,4.16-37.5-18.88-59.92-52.45-118.06-94.9-164.37ZM111.58,307.13l124.14-215.03,124.15,215.03H111.58Z"/>
+      </svg>
+      <div>
+        <div class="logo-text">Composable CDP</div>
+        <div class="logo-sub">Package Builder & Cost Estimator</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="count-label" id="header-label">6 core + 2 selected</span>
+      <div class="badge" id="header-total">8 total features</div>
+    </div>
+  </div>
+</div>
+
+<!-- STEPPER -->
+<div class="stepper">
+  <div class="step-pill active" id="sp1">
+    <div class="num">1</div>
+    <div class="label">Define Package</div>
+  </div>
+  <div class="step-connector" id="sc1"></div>
+  <div class="step-pill inactive" id="sp2">
+    <div class="num">2</div>
+    <div class="label">Estimate Cost</div>
+  </div>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="main">
+
+  <!-- LEFT COLUMN -->
+  <div>
+
+    <!-- ══ STEP 1 ══ -->
+    <div class="step-panel visible" id="step1">
+
+      <!-- Core Platform -->
+      <div style="margin-bottom:36px;">
+        <div class="section-hd">
+          <div class="step-num">1</div>
+          <div>
+            <div class="step-title">Core Platform</div>
+            <div class="step-sub">Always included in every package — these are the minimum viable foundation.</div>
+          </div>
+        </div>
+        <div class="callout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#11875A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span><strong>6 features always included.</strong> Audience Segmentation is pre-selected but can be deselected if your use case is pure Reverse ETL.</span>
+        </div>
+        <div class="grid2" id="core-grid"></div>
+        <div class="opt-core-card on" id="card-audiences" onclick="toggleOptCore('audiences')">
+          <div class="opt-core-hd">
+            <div class="opt-core-left">
+              <div class="card-icon" id="icon-audiences">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <div style="font-size:15px;font-weight:600;color:#0B1221;">Audience Segmentation</div>
+            </div>
+            <div class="opt-core-right">
+              <span class="status-pill status-on" id="pill-audiences">Included</span>
+              <button class="learn-btn" onclick="event.stopPropagation();showModal('audiences')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                Details
+              </button>
+            </div>
+          </div>
+          <p style="font-size:13px;color:#4A5571;margin-top:10px;line-height:1.5;">Recommended for most deployments — required if you activate audiences to any destination.</p>
+        </div>
+      </div>
+
+      <!-- Build Package -->
+      <div>
+        <div class="section-hd">
+          <div class="step-num">2</div>
+          <div>
+            <div class="step-title">Build Your Package</div>
+            <div class="step-sub">Select additional capabilities. Your choices will unlock the relevant cost inputs in Step 2.</div>
+          </div>
+        </div>
+
+        <!-- Pre-selected -->
+        <div>
+          <div class="sdiv">
+            <div class="sdot" style="background:#A78BFA;border-color:#A78BFA;"></div>
+            <span class="slabel">Pre-selected</span>
+            <div class="sline"></div>
+            <span class="scount">On by default — click to remove</span>
+          </div>
+          <div class="grid2" id="preselected-grid"></div>
+        </div>
+
+        <div id="optional-groups"></div>
+      </div>
+
+      <div class="next-btn-wrap">
+        <span style="font-size:13px;color:#6B7591;" id="next-hint">Select your features, then continue to estimate cost</span>
+        <button class="next-btn" onclick="goToStep2()">
+          Continue to Cost Estimate
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ STEP 2 ══ -->
+    <div class="step-panel" id="step2">
+
+      <div class="calc-intro">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <div style="font-size:16px;font-weight:700;color:#0B1221;">Infrastructure Cost Estimate</div>
+          <span style="font-size:12px;color:#B45309;font-family:monospace;background:#FEF3C7;padding:2px 8px;border-radius:6px;border:1px solid #FCD34D;">Sales use only — not a billing contract</span>
+        </div>
+        <p>Input sections are enabled or disabled based on your package selection. <strong>Greyed-out sections</strong> are not applicable to your current package — add those features in Step 1 to unlock them. Adjust the active sliders to match the customer's expected usage.</p>
+      </div>
+
+      <!-- Presets -->
+      <div style="background:#fff;border:1px solid #E5EAF2;border-radius:14px;padding:20px 24px;margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:600;color:#0B1221;margin-bottom:12px;">Quick Size Preset</div>
+        <div class="presets-bar">
+          <button class="preset-btn" data-preset="starter">Starter<span class="preset-sub">500K profiles</span></button>
+          <button class="preset-btn" data-preset="growth">Growth<span class="preset-sub">5M profiles</span></button>
+          <button class="preset-btn" data-preset="scale">Scale<span class="preset-sub">25M profiles</span></button>
+          <button class="preset-btn" data-preset="enterprise">Enterprise<span class="preset-sub">100M+ profiles</span></button>
+        </div>
+      </div>
+
+      <!-- Section A: Sync Workload — always active -->
+      <div class="calc-section" id="sec-sync">
+        <div class="calc-section-hd">
+          <div class="calc-section-title">
+            <div class="calc-section-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </div>
+            Sync Workload
+          </div>
+          <span class="calc-reason locked">Core — always active</span>
+        </div>
+        <div class="grid2" style="gap:16px;">
+          <div class="field">
+            <div class="field-row"><label class="field-label" for="numSyncs">Number of syncs</label><span class="field-val" id="numSyncs-val">10</span></div>
+            <div class="pair"><input type="range" id="numSyncs" min="1" max="100" step="1" value="10"/><input type="number" id="numSyncs-num" min="1" max="500" value="10"/></div>
+            <div class="field-hint">Distinct audience or source syncs configured.</div>
+          </div>
+          <div class="field">
+            <div class="field-row"><label class="field-label" for="syncFreq">Runs per sync per day</label><span class="field-val" id="syncFreq-val">6</span></div>
+            <div class="pair"><input type="range" id="syncFreq" min="1" max="288" step="1" value="6"/><input type="number" id="syncFreq-num" min="1" max="1440" value="6"/></div>
+            <div class="field-hint">1 = daily · 6 = every 4h · 24 = hourly</div>
+          </div>
+          <div class="field">
+            <div class="field-row"><label class="field-label" for="profiles">User profiles</label><span class="field-val" id="profiles-val">10M</span></div>
+            <div class="pair"><input type="range" id="profiles" min="100000" max="500000000" step="100000" value="10000000"/><input type="number" id="profiles-num" min="1000" step="1000" value="10000000"/></div>
+            <div class="field-hint">Total addressable profiles in the CDP.</div>
+          </div>
+          <div class="field">
+            <div class="field-row"><label class="field-label" for="eventsPerProfile">Events / profile / day</label><span class="field-val" id="eventsPerProfile-val">5</span></div>
+            <div class="pair"><input type="range" id="eventsPerProfile" min="0" max="100" step="0.5" value="5"/><input type="number" id="eventsPerProfile-num" min="0" step="0.5" value="5"/></div>
+            <div class="field-hint">Behavioural events per profile per day.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section B: Events Ingestion — Streams only -->
+      <div class="calc-section disabled" id="sec-events">
+        <div class="calc-section-hd">
+          <div class="calc-section-title">
+            <div class="calc-section-icon purple">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            Events Ingestion Traffic
+          </div>
+          <span class="calc-reason" id="reason-events">Add Streams to unlock</span>
+        </div>
+        <span class="disabled-reason" id="hint-events">Requires: Streams (Event Collection) in your package</span>
+        <div class="grid2" style="gap:16px;margin-top:14px;">
+          <div class="field">
+            <div class="field-row"><label class="field-label" for="avgRpm">Average requests / min (RPM)</label><span class="field-val" id="avgRpm-val">100</span></div>
+            <div class="pair"><input type="range" id="avgRpm" min="0" max="100000" step="10" value="100"/><input type="number" id="avgRpm-num" min="0" step="10" value="100"/></div>
+            <div class="field-hint">Sustained events ingestion API rate.</div>
+          </div>
+          <div class="field">
+            <div class="field-row"><label class="field-label" for="peakRpm">Peak requests / min</label><span class="field-val" id="peakRpm-val">500</span></div>
+            <div class="pair"><input type="range" id="peakRpm" min="0" max="500000" step="50" value="500"/><input type="number" id="peakRpm-num" min="0" step="50" value="500"/></div>
+            <div class="field-hint">Burst rate during traffic spikes.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section C: Audience Boost — Audience Boost only -->
+      <div class="calc-section disabled" id="sec-boost">
+        <div class="calc-section-hd">
+          <div class="calc-section-title">
+            <div class="calc-section-icon amber">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            Audience Boost (Bigtable)
+          </div>
+          <span class="calc-reason" id="reason-boost">Add Audience Boost to unlock</span>
+        </div>
+        <span class="disabled-reason" id="hint-boost">Requires: Audience Boost in your package</span>
+        <div class="grid2" style="gap:16px;margin-top:14px;">
+          <div class="field">
+            <div class="field-row"><label class="field-label" for="boostSyncs">Syncs with Audience Boost</label><span class="field-val" id="boostSyncs-val">0</span></div>
+            <div class="pair"><input type="range" id="boostSyncs" min="0" max="100" step="1" value="0"/><input type="number" id="boostSyncs-num" min="0" max="500" value="0"/></div>
+            <div class="field-hint">Boost-enabled syncs run Bigtable identity lookups.</div>
+          </div>
+          <div class="field">
+            <div class="field-row"><label class="field-label" for="boostAudiencePct">Avg audience size (% of profiles)</label><span class="field-val" id="boostAudiencePct-val">20%</span></div>
+            <div class="pair"><input type="range" id="boostAudiencePct" min="1" max="100" step="1" value="20"/><input type="number" id="boostAudiencePct-num" min="1" max="100" value="20"/></div>
+            <div class="field-hint">Average audience size per boosted sync.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section D: Orchestrations worker cost — Orchestrations only -->
+      <div class="calc-section disabled" id="sec-orch">
+        <div class="calc-section-hd">
+          <div class="calc-section-title">
+            <div class="calc-section-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+            </div>
+            Orchestration Event Forwarding
+          </div>
+          <span class="calc-reason" id="reason-orch">Add Orchestrations to unlock</span>
+        </div>
+        <span class="disabled-reason" id="hint-orch">Requires: Orchestrations (Journey Builder) in your package</span>
+        <div class="grid2" style="gap:16px;margin-top:14px;">
+          <div class="field">
+            <div class="field-row"><label class="field-label" for="orchFwdPct">% of events forwarded via journeys</label><span class="field-val" id="orchFwdPct-val">25%</span></div>
+            <div class="pair"><input type="range" id="orchFwdPct" min="0" max="100" step="5" value="25"/><input type="number" id="orchFwdPct-num" min="0" max="100" step="5" value="25"/></div>
+            <div class="field-hint">Share of processed events forwarded through orchestration journeys.</div>
+          </div>
+          <div class="field">
+            <div class="field-row"><label class="field-label" for="orchFanout">Avg destinations per event (fan-out)</label><span class="field-val" id="orchFanout-val">1.5</span></div>
+            <div class="pair"><input type="range" id="orchFanout" min="1" max="10" step="0.5" value="1.5"/><input type="number" id="orchFanout-num" min="1" max="20" step="0.5" value="1.5"/></div>
+            <div class="field-hint">How many destinations each forwarded event fans out to.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADVANCED SETTINGS -->
+      <details class="adv-details" id="advDetails">
+        <summary>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 0-14.14 0"/><path d="M4.93 19.07a10 10 0 0 0 14.14 0"/><path d="M21.17 8A10 10 0 0 0 2.83 8"/><path d="M2.83 16a10 10 0 0 0 18.34 0"/></svg>
+          Advanced Settings · Cost rates & assumptions
+          <svg class="adv-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </summary>
+        <div class="adv-body">
+
+          <div class="adv-group">
+            <div class="adv-group-title">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              Cloud Run — Jobs (sync execution)
+            </div>
+            <div class="adv-grid">
+              <div class="adv-field"><label for="r_job_vcpu">vCPU $/sec (job)</label><input id="r_job_vcpu" type="number" step="0.0000001" value="0.000024"/></div>
+              <div class="adv-field"><label for="r_job_mem">Memory $/GiB-sec (job)</label><input id="r_job_mem" type="number" step="0.0000001" value="0.0000025"/></div>
+              <div class="adv-field"><label for="r_job_cpu_count">vCPU per job task</label><input id="r_job_cpu_count" type="number" step="0.5" value="2"/></div>
+              <div class="adv-field"><label for="r_job_mem_count">Memory GiB per job task</label><input id="r_job_mem_count" type="number" step="0.5" value="4"/></div>
+              <div class="adv-field"><label for="r_job_query_sec">Warehouse query time (sec)</label><input id="r_job_query_sec" type="number" step="5" value="300"/></div>
+              <div class="adv-field"><label for="r_job_upload_rps">Upload rate limit (records/sec)</label><input id="r_job_upload_rps" type="number" step="50" value="2000"/></div>
+              <div class="adv-field"><label for="r_job_overhead_sec">Job overhead (startup + teardown sec)</label><input id="r_job_overhead_sec" type="number" step="1" value="120"/></div>
+            </div>
+          </div>
+
+          <div class="adv-group">
+            <div class="adv-group-title">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              Cloud Run — Always-on Events Ingestion API
+            </div>
+            <div class="adv-grid">
+              <div class="adv-field"><label for="r_svc_vcpu_on">vCPU $/sec (always-on)</label><input id="r_svc_vcpu_on" type="number" step="0.0000001" value="0.000018"/></div>
+              <div class="adv-field"><label for="r_svc_mem_on">Memory $/GiB-sec (always-on)</label><input id="r_svc_mem_on" type="number" step="0.0000001" value="0.000002"/></div>
+              <div class="adv-field"><label for="r_svc_rpm_per_instance">Sustained RPM per instance</label><input id="r_svc_rpm_per_instance" type="number" step="100" value="3000"/></div>
+              <div class="adv-field"><label for="r_svc_instance_vcpu">vCPU per instance</label><input id="r_svc_instance_vcpu" type="number" step="0.25" value="1"/></div>
+              <div class="adv-field"><label for="r_svc_instance_mem">Memory GiB per instance</label><input id="r_svc_instance_mem" type="number" step="0.25" value="1"/></div>
+              <div class="adv-field"><label for="r_svc_request_cost">$ per million requests</label><input id="r_svc_request_cost" type="number" step="0.01" value="0.40"/></div>
+              <div class="adv-field"><label for="r_svc_burst_factor">Burst headroom factor</label><input id="r_svc_burst_factor" type="number" step="0.05" value="1.25"/></div>
+            </div>
+          </div>
+
+          <div class="adv-group">
+            <div class="adv-group-title">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+              Worker Pool (processing + forwarding + warehouse writes)
+            </div>
+            <div class="adv-grid">
+              <div class="adv-field"><label for="r_wp_ms_cpu_per_event">ms vCPU per event (base)</label><input id="r_wp_ms_cpu_per_event" type="number" step="0.1" value="3"/></div>
+              <div class="adv-field"><label for="r_wp_ms_mem_per_event">ms GiB-mem per event (base)</label><input id="r_wp_ms_mem_per_event" type="number" step="0.1" value="3"/></div>
+              <div class="adv-field"><label for="r_wp_fwd_ms_cpu">Additional ms vCPU per forwarded event</label><input id="r_wp_fwd_ms_cpu" type="number" step="0.1" value="2"/></div>
+              <div class="adv-field"><label for="r_wp_fwd_ms_mem">Additional ms GiB-mem per forwarded event</label><input id="r_wp_fwd_ms_mem" type="number" step="0.1" value="1.5"/></div>
+              <div class="adv-field"><label for="r_wp_vcpu">vCPU $/sec (worker)</label><input id="r_wp_vcpu" type="number" step="0.0000001" value="0.000024"/></div>
+              <div class="adv-field"><label for="r_wp_mem">Memory $/GiB-sec (worker)</label><input id="r_wp_mem" type="number" step="0.0000001" value="0.0000025"/></div>
+            </div>
+          </div>
+
+          <div class="adv-group">
+            <div class="adv-group-title">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Forwarding & Egress
+            </div>
+            <div class="adv-grid">
+              <div class="adv-field"><label for="r_fwd_pct">% of events forwarded (base)</label><input id="r_fwd_pct" type="number" step="5" min="0" max="100" value="25"/></div>
+              <div class="adv-field"><label for="r_fwd_fanout">Avg destinations per event (fan-out)</label><input id="r_fwd_fanout" type="number" step="0.1" value="1.5"/></div>
+              <div class="adv-field"><label for="r_egress_kb_per_event">KB egress per forwarded event</label><input id="r_egress_kb_per_event" type="number" step="0.1" value="1.2"/></div>
+              <div class="adv-field"><label for="r_egress_per_gb">$ / GB egress</label><input id="r_egress_per_gb" type="number" step="0.01" value="0.12"/></div>
+            </div>
+          </div>
+
+          <div class="adv-group">
+            <div class="adv-group-title">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              Audience Boost — Bigtable
+            </div>
+            <div class="adv-grid">
+              <div class="adv-field"><label for="r_bt_lookups_per_profile">Bigtable lookups per profile</label><input id="r_bt_lookups_per_profile" type="number" step="0.5" value="1.5"/></div>
+              <div class="adv-field"><label for="r_bt_node_hr">$ per Bigtable node-hour</label><input id="r_bt_node_hr" type="number" step="0.05" value="0.65"/></div>
+              <div class="adv-field"><label for="r_bt_node_rps">Reads / sec per node</label><input id="r_bt_node_rps" type="number" step="1000" value="10000"/></div>
+              <div class="adv-field"><label for="r_bt_min_nodes">Min always-on nodes (when boost enabled)</label><input id="r_bt_min_nodes" type="number" step="1" min="1" value="1"/></div>
+              <div class="adv-field"><label for="r_bt_storage_gb">Bigtable storage GB (ID graph)</label><input id="r_bt_storage_gb" type="number" step="10" value="50"/></div>
+              <div class="adv-field"><label for="r_bt_storage_cost">$ / GB-month (SSD)</label><input id="r_bt_storage_cost" type="number" step="0.01" value="0.17"/></div>
+              <div class="adv-field"><label for="r_bt_extra_upload_sec">Extra upload sec per boosted sync</label><input id="r_bt_extra_upload_sec" type="number" step="5" value="30"/></div>
+            </div>
+          </div>
+
+          <div class="adv-group">
+            <div class="adv-group-title">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              Base Platform
+            </div>
+            <div class="adv-grid">
+              <div class="adv-field"><label for="r_base_monthly">Fixed monthly base ($)</label><input id="r_base_monthly" type="number" step="10" value="450"/></div>
+              <div class="adv-field"><label for="r_margin">Operational margin / buffer (%)</label><input id="r_margin" type="number" step="1" value="15"/></div>
+            </div>
+          </div>
+
+          <button class="adv-reset" id="advResetBtn" type="button">↺ Reset all rates to defaults</button>
+        </div>
+      </details>
+
+      <!-- RESULTS -->
+      <div style="margin-top:24px;">
+        <div class="result-card">
+          <div class="rlabel">Estimated Monthly Infrastructure Cost</div>
+          <div class="rvalue" id="totalMonthly">$0</div>
+          <div class="rsub">
+            <span>Annual: <strong id="totalAnnual">$0</strong></span>
+            <span style="opacity:0.4">·</span>
+            <span>Per profile / mo: <strong id="perProfile">$0.0000</strong></span>
+            <span style="opacity:0.4">·</span>
+            <span>Per M events: <strong id="perMillion">$0.00</strong></span>
+          </div>
+        </div>
+
+        <div class="breakdown-wrap">
+          <div class="bk-title">Cost Breakdown — Monthly</div>
+          <div class="stacked-bar" id="stackedBar"></div>
+          <table class="bk-table">
+            <thead><tr><th>Component</th><th class="cost">Cost / mo</th><th class="pct">%</th></tr></thead>
+            <tbody id="breakdownBody"></tbody>
+            <tfoot>
+              <tr><td>Subtotal</td><td class="cost" id="subtotalRow">$0</td><td></td></tr>
+              <tr><td id="marginLabel">Operational margin (15%)</td><td class="cost" id="marginRow">$0</td><td></td></tr>
+              <tr><td><strong>Total</strong></td><td class="cost" id="totalRow"><strong>$0</strong></td><td></td></tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="metrics-wrap">
+          <div class="metrics-title">Derived Technical Metrics</div>
+          <div class="kv"><span class="k">Total events / month</span><span class="v" id="d_events_month">—</span></div>
+          <div class="kv"><span class="k">Sync invocations / month</span><span class="v" id="d_sync_invocations">—</span></div>
+          <div class="kv"><span class="k">Avg sync duration</span><span class="v" id="d_sync_duration">—</span></div>
+          <div class="kv" id="kv-min-instances"><span class="k">Min always-on instances (events API)</span><span class="v" id="d_min_instances">—</span></div>
+          <div class="kv" id="kv-peak-instances"><span class="k">Peak instances needed</span><span class="v" id="d_peak_instances">—</span></div>
+          <div class="kv" id="kv-egress"><span class="k">Network egress / month</span><span class="v" id="d_egress_month">—</span></div>
+        </div>
+      </div>
+
+      <div class="next-btn-wrap">
+        <button class="back-btn" onclick="goToStep1()">
+          ← Back to Package
+        </button>
+      </div>
+
+    </div>
+    <!-- end step2 -->
+
+  </div>
+  <!-- end left col -->
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-hd">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#004BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      <div>
+        <div class="sb-pkg-label">Your Package</div>
+        <div class="sb-total" id="sidebar-total">8 Features</div>
+      </div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-sec-label">Core (always included)</div>
+      <div id="sidebar-core"></div>
+    </div>
+    <div id="sidebar-selected-section" class="sb-section" style="display:none;">
+      <div class="sb-sec-label">Selected Features</div>
+      <div id="sidebar-selected"></div>
+    </div>
+    <div id="sidebar-addons-section" class="sb-section" style="display:none;">
+      <div class="sb-sec-label">Add-ons</div>
+      <div id="sidebar-addons"></div>
+    </div>
+    <div id="sidebar-empty" class="empty-state" style="display:none;">Add features from the catalogue</div>
+
+    <hr class="sb-divider"/>
+    <div class="sb-step-label" id="sb-step-label">Step 1: Define your package</div>
+    <button class="export-btn" id="export-btn" disabled onclick="goToStep2()">
+      Continue to Cost Estimate →
+    </button>
+    <div class="export-hint" id="export-hint">Complete Step 1 first</div>
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modal" style="display:none;" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-hd">
+      <div class="modal-icon-wrap" id="modal-icon"></div>
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="modal-title" id="modal-title"></div>
+          <span id="modal-addon-pill" style="display:none;background:#EBF1FF;color:#004BFF;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;border:1px solid #D9E5FF;">Add-on</span>
+        </div>
+        <a class="modal-link" id="modal-link" href="#" target="_blank"></a>
+      </div>
+    </div>
+    <p class="modal-desc" id="modal-desc"></p>
+    <div id="modal-usecases"></div>
+  </div>
+</div>
+
+<script>
+// ─── ICONS ───────────────────────────────────────────────────────────────────
+const ICONS = {
+  database:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>`,
+  layers:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`,
+  "git-merge":`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>`,
+  users:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  send:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
+  "refresh-cw":`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`,
+  shield:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+  fingerprint:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 4"/><path d="M5 19.5C5.5 18 6 15 6 12c0-3.3 2.7-6 6-6"/><path d="M17.8 21c.2-1.3.2-2.7 0-4"/><path d="M15 12a3 3 0 0 0-6 0c0 2.5-.3 4.6-.6 6"/><path d="M22 13.6c-.7-.3-1.4-.6-2-.6"/></svg>`,
+  calculator:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="10" x2="16" y2="14"/><line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>`,
+  "download-cloud":`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>`,
+  zap:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+  layout:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>`,
+  "git-branch":`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>`,
+  "list-ordered":`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>`,
+  copy:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  activity:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+  "git-pull-request":`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>`,
+  cpu:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`,
+  "bar-chart-2":`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+  "cloud-snow":`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="8" y1="20" x2="8.01" y2="20"/><line x1="12" y1="18" x2="12.01" y2="18"/><line x1="12" y1="22" x2="12.01" y2="22"/><line x1="16" y1="16" x2="16.01" y2="16"/><line x1="16" y1="20" x2="16.01" y2="20"/></svg>`,
+  check:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  info:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+  "chevron-right":`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`,
+};
+
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const LOCKED_CORE = [
+  { id:"warehouse", name:"Warehouse Connection", icon:"database", desc:"Connect directly to your cloud data warehouse (Snowflake, BigQuery, Databricks) without moving data.", why:"Required — nothing works without this.", docs:"composable-docs.zeotap.com/warehouses", useCases:["Zero-copy Snowflake/BigQuery/Databricks access","Connecting multiple warehouses","Secure credential management"] },
+  { id:"models", name:"Data Models", icon:"layers", desc:"Transform raw warehouse tables into structured, queryable models using SQL or a no-code column configurator.", why:"Required — defines what tables represent customers.", docs:"composable-docs.zeotap.com/models", useCases:["Mapping raw tables to customer entities","SQL-based model creation","Column-level configuration"] },
+  { id:"relationships", name:"Relationships & Schema", icon:"git-merge", desc:"Define how your entities relate — customers to orders, orders to products. Includes Entity Types, Relationships, and ERD Visualisation.", why:"Required for cross-entity segmentation.", docs:"composable-docs.zeotap.com/schema", useCases:["Linking customers to order history","ERD visualisation","Cross-entity audience logic"] },
+  { id:"destinations", name:"Destinations (Core)", icon:"send", desc:"Connect to downstream tools — CRMs, marketing platforms, ad networks. Includes field mapping and sync mode configuration.", why:"Required to activate data outside the CDP.", docs:"composable-docs.zeotap.com/destinations", useCases:["Syncing to Salesforce or Braze","Field mapping configuration","Full/incremental sync modes"] },
+  { id:"reverseETL", name:"Reverse ETL Syncs", icon:"refresh-cw", desc:"Push modelled data back from your warehouse to operational tools on a schedule or trigger.", why:"Required to operationalise warehouse data in CRMs.", docs:"composable-docs.zeotap.com/syncs", useCases:["Scheduled syncs to CRM","Field transformation on sync","Monitoring sync run health"] },
+  { id:"governance", name:"Governance & RBAC", icon:"shield", desc:"Role-based access control, PII masking, destination policies, and access filters.", why:"Required for enterprise data access control.", docs:"composable-docs.zeotap.com/govern", useCases:["Team-level permission management","PII field masking","Destination access policies"] },
+];
+
+const OPT_CORE = { id:"audiences", name:"Audience Segmentation", icon:"users", desc:"Build audiences using a visual filter builder with rich operators. Includes size estimation and audience preview before activation.", why:"Recommended — required to activate audiences to any destination.", docs:"composable-docs.zeotap.com/segment/audiences", useCases:["Building campaign audiences from warehouse data","Creating suppression lists","Targeting high-value customer cohorts"] };
+
+const PRESELECTED = [
+  { id:"orchestrations", name:"Orchestrations (Journey Builder)", icon:"git-pull-request", premium:true, desc:"Multi-step, trigger-based workflow automation. Build branching journeys with conditions, waits, and actions — with execution monitoring.", docs:"composable-docs.zeotap.com/journeys", useCases:["Triggered onboarding sequences","Cross-channel re-engagement journeys","Lifecycle automation"] },
+];
+
+const OPTIONAL_GROUPS = [
+  { id:"identity", label:"Identity", color:"#E7E5F8", features:[
+    { id:"identity_resolution", name:"Identity Resolution", icon:"fingerprint", desc:"Stitch fragmented identifiers into unified golden records. Configure identifier families, merge rules, probabilistic matching, and limit rules.", docs:"composable-docs.zeotap.com/identity-resolution", useCases:["Cross-device customer recognition","De-duplicating profiles across sources","Building a single customer ID"] },
+  ]},
+  { id:"enrichment", label:"Data Enrichment", color:"#D9E1F8", features:[
+    { id:"computed_attributes", name:"Computed Attributes", icon:"calculator", desc:"Derive enriched attributes using SQL traits, aggregation traits, and formula traits. Re-evaluated on a schedule.", docs:"composable-docs.zeotap.com/segment/traits", useCases:["Lifetime value calculation","RFM scoring","Days since last purchase"] },
+    { id:"loaders", name:"Loaders (SaaS Ingestion)", icon:"download-cloud", desc:"Pull data from SaaS tools (Salesforce, HubSpot, Marketo, Stripe, Shopify) into your warehouse.", docs:"composable-docs.zeotap.com/loaders", useCases:["Adding CRM attributes to warehouse profiles","Enriching with subscription data","Pulling ad engagement data"] },
+    { id:"audience_boost", name:"Audience Boost", icon:"zap", premium:true, desc:"Expand audiences using Zeotap's third-party data enrichment. Bigtable-powered identity lookups during sync runs.", docs:"composable-docs.zeotap.com/segment/audience-boost", useCases:["Expanding CRM audiences for prospecting","Third-party data enrichment","Look-alike audience building"] },
+  ]},
+  { id:"activation_advanced", label:"Advanced Activation", color:"#E8F4F1", features:[
+    { id:"audience_canvas", name:"Audience Canvas", icon:"layout", desc:"Visual multi-step audience orchestration. Branching segment trees with versioning, rollback, and canvas-owned audiences.", docs:"composable-docs.zeotap.com/segment/audience-canvas", useCases:["Complex multi-condition segment trees","Visual audience logic documentation","Versioned audience definitions"] },
+    { id:"ab_tests", name:"A/B Tests & Splits", icon:"git-branch", desc:"Split audiences into test and control groups. Define percentage splits and assign each group to different activation paths.", docs:"composable-docs.zeotap.com/segment/splits", useCases:["Holdout group testing","Channel experiment design","Incremental lift measurement"] },
+    { id:"priority_lists", name:"Priority Lists", icon:"list-ordered", desc:"Ordered priority rules across audiences — customers assigned to the highest-priority segment they qualify for.", docs:"composable-docs.zeotap.com/segment/priority-lists", useCases:["Tiered loyalty programme logic","Suppression hierarchy","Mutually exclusive segments"] },
+    { id:"audience_templates", name:"Audience Templates", icon:"copy", desc:"Save and reuse audience definitions as templates across teams and use cases.", docs:"composable-docs.zeotap.com/segment/audience-templates", useCases:["Standardising segment definitions","Team-wide audience library","Rapid campaign set-up"] },
+  ]},
+  { id:"real_time", label:"Real-Time & Events", color:"#FDF0E8", features:[
+    { id:"streams", name:"Streams (Event Collection)", icon:"activity", premium:true, desc:"Real-time event ingestion. Browser SDK, event contracts, transformations, forwarding, consent management, and events warehouse.", docs:"composable-docs.zeotap.com/events", useCases:["Real-time behavioural data collection","Server-side event tracking","Consent-aware event routing"] },
+  ]},
+  { id:"intelligence", label:"Intelligence & AI", color:"#E7E5F8", features:[
+    { id:"zeotap_agent", name:"Zeotap Agent (AI Layer)", icon:"cpu", premium:true, desc:"Natural Language Audience Builder, conversational AI Agent, MCP Server integration, and guardrails.", docs:"composable-docs.zeotap.com/agent-smith", useCases:["Build audiences with plain-English instructions","Agentic CDP workflows","AI-powered campaign planning"] },
+  ]},
+  { id:"observability", label:"Observability", color:"#EEF2F9", features:[
+    { id:"insights", name:"Insights & Observability", icon:"bar-chart-2", desc:"Sync Health dashboards, Audience Trends, Activation Coverage reporting, and Audience Overlap analysis.", docs:"composable-docs.zeotap.com/insights", useCases:["Monitoring sync reliability","Tracking audience growth","Understanding segment overlap"] },
+    { id:"snowflake_native", name:"Snowflake Native App", icon:"cloud-snow", premium:true, desc:"Deploy the entire Composable CDP as a Snowflake Native App — running entirely within your Snowflake environment.", docs:"composable-docs.zeotap.com/snowflake-native-app", useCases:["Full data residency within Snowflake","Zero-copy deployment model","Snowflake Marketplace distribution"] },
+  ]},
+];
+
+const ALL_FEATURES = [...LOCKED_CORE, OPT_CORE, ...PRESELECTED, ...OPTIONAL_GROUPS.flatMap(g=>g.features)];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const state = new Set(["audiences","orchestrations"]);
+let currentStep = 1;
+
+// ─── RENDER STEP 1 ───────────────────────────────────────────────────────────
+function renderCoreGrid() {
+  document.getElementById("core-grid").innerHTML = LOCKED_CORE.map(f=>`
+    <div class="core-card">
+      <div class="core-badge"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Included</div>
+      <div class="card-row"><div class="card-icon">${ICONS[f.icon]}</div><div class="card-title">${f.name}</div></div>
+      <p class="card-desc">${f.desc.length>100?f.desc.slice(0,100)+'…':f.desc}</p>
+      <div class="card-footer"><span class="card-why">${f.why}</span><button class="learn-btn" onclick="showModal('${f.id}')">Details ${ICONS["chevron-right"]}</button></div>
+    </div>`).join("");
+}
+
+function renderPreselected() {
+  document.getElementById("preselected-grid").innerHTML = PRESELECTED.map(f=>optCard(f)).join("");
+}
+
+function renderGroups() {
+  document.getElementById("optional-groups").innerHTML = OPTIONAL_GROUPS.map(g=>{
+    const sel = g.features.filter(f=>state.has(f.id)).length;
+    return `<div>
+      <div class="sdiv">
+        <div class="sdot" style="background:${g.color};border-color:${g.color};"></div>
+        <span class="slabel">${g.label}</span>
+        <div class="sline"></div>
+        <span class="scount">${sel}/${g.features.length} selected</span>
+      </div>
+      <div class="grid2">${g.features.map(f=>optCard(f)).join("")}</div>
+    </div>`;
+  }).join("");
+}
+
+function optCard(f) {
+  const on = state.has(f.id);
+  return `<div class="opt-card ${on?'on':''}" id="optcard-${f.id}" onclick="toggleOpt('${f.id}')">
+    ${f.premium?`<span class="addon-pill">Add-on</span>`:''}
+    <div class="card-row">
+      <div class="opt-card-icon" id="opticon-${f.id}">${on?ICONS.check:ICONS[f.icon]}</div>
+      <div class="opt-card-title">${f.name}</div>
+    </div>
+    <p class="card-desc" style="font-size:13px;">${f.desc.length>90?f.desc.slice(0,90)+'…':f.desc}</p>
+    <button class="details-btn" onclick="event.stopPropagation();showModal('${f.id}')">${ICONS.info} Details</button>
+  </div>`;
+}
+
+// ─── TOGGLE ──────────────────────────────────────────────────────────────────
+function toggleOptCore(id) {
+  state.has(id)?state.delete(id):state.add(id);
+  const on = state.has(id);
+  document.getElementById("card-"+id).classList.toggle("on", on);
+  document.getElementById("pill-"+id).className = "status-pill "+(on?"status-on":"status-off");
+  document.getElementById("pill-"+id).textContent = on?"Included":"Deselected";
+  document.getElementById("icon-"+id).innerHTML = on?ICONS.users.replace('stroke="currentColor"','stroke="#004BFF"'):ICONS.users;
+  updateSidebar();
+  if(currentStep===2) { updateCalcSections(); calcAndRender(); }
+}
+
+function toggleOpt(id) {
+  state.has(id)?state.delete(id):state.add(id);
+  const on = state.has(id);
+  const card = document.getElementById("optcard-"+id);
+  const iconEl = document.getElementById("opticon-"+id);
+  const f = ALL_FEATURES.find(x=>x.id===id);
+  card.classList.toggle("on",on);
+  iconEl.innerHTML = on?ICONS.check:(f?ICONS[f.icon]:'');
+  renderGroups();
+  updateSidebar();
+  if(currentStep===2) { updateCalcSections(); calcAndRender(); }
+}
+
+// ─── SIDEBAR ─────────────────────────────────────────────────────────────────
+function updateSidebar() {
+  const allToggleable = [OPT_CORE,...PRESELECTED,...OPTIONAL_GROUPS.flatMap(g=>g.features)];
+  const selectedItems = allToggleable.filter(f=>state.has(f.id));
+  const standard = selectedItems.filter(f=>!f.premium);
+  const addons = selectedItems.filter(f=>f.premium);
+  const total = LOCKED_CORE.length + state.size;
+
+  document.getElementById("sidebar-total").textContent = total+" Features";
+  document.getElementById("header-total").textContent = total+" total features";
+  document.getElementById("header-label").textContent = LOCKED_CORE.length+" core + "+state.size+" selected";
+
+  document.getElementById("sidebar-core").innerHTML = LOCKED_CORE.map(f=>`<div class="sb-item"><span class="c-green">${ICONS.check}</span><span>${f.name}</span></div>`).join("");
+
+  const selSec = document.getElementById("sidebar-selected-section");
+  if(standard.length>0){ selSec.style.display=""; document.getElementById("sidebar-selected").innerHTML = standard.map(f=>`<div class="sb-item"><span class="c-blue">${ICONS.check}</span><span>${f.name}</span></div>`).join(""); } else selSec.style.display="none";
+
+  const adSec = document.getElementById("sidebar-addons-section");
+  if(addons.length>0){ adSec.style.display=""; document.getElementById("sidebar-addons").innerHTML = addons.map(f=>`<div class="sb-item"><span class="c-purple">${ICONS.check}</span><span>${f.name}</span></div>`).join(""); } else adSec.style.display="none";
+
+  document.getElementById("sidebar-empty").style.display = state.size===0?"":"none";
+
+  if(currentStep===1){
+    document.getElementById("export-btn").disabled = false;
+    document.getElementById("export-btn").textContent = "Continue to Cost Estimate →";
+    document.getElementById("export-btn").onclick = goToStep2;
+    document.getElementById("export-hint").textContent = "Step 1 of 2 — continue to estimate";
+    document.getElementById("sb-step-label").textContent = "Step 1: Define your package";
+  } else {
+    document.getElementById("export-btn").textContent = "Export Package Definition";
+    document.getElementById("export-btn").disabled = false;
+    document.getElementById("export-btn").onclick = ()=>alert("Package exported! Share with your Zeotap account team.");
+    document.getElementById("export-hint").textContent = "Share with your Zeotap account team";
+    document.getElementById("sb-step-label").textContent = "Step 2: Adjust usage & get estimate";
+  }
+}
+
+// ─── STEP NAVIGATION ─────────────────────────────────────────────────────────
+function goToStep2() {
+  currentStep = 2;
+  document.getElementById("step1").classList.remove("visible");
+  document.getElementById("step2").classList.add("visible");
+  // stepper UI
+  document.getElementById("sp1").className = "step-pill done";
+  document.getElementById("sc1").className = "step-connector done";
+  document.getElementById("sp2").className = "step-pill active";
+  updateCalcSections();
+  calcAndRender();
+  updateSidebar();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function goToStep1() {
+  currentStep = 1;
+  document.getElementById("step2").classList.remove("visible");
+  document.getElementById("step1").classList.add("visible");
+  document.getElementById("sp1").className = "step-pill active";
+  document.getElementById("sc1").className = "step-connector";
+  document.getElementById("sp2").className = "step-pill inactive";
+  updateSidebar();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+// ─── CALC SECTION ENABLE/DISABLE ─────────────────────────────────────────────
+function updateCalcSections() {
+  const hasStreams = state.has("streams");
+  const hasBoost = state.has("audience_boost");
+  const hasOrch = state.has("orchestrations");
+
+  // Events ingestion
+  const secEvents = document.getElementById("sec-events");
+  secEvents.classList.toggle("disabled", !hasStreams);
+  document.getElementById("reason-events").textContent = hasStreams ? "Unlocked — Streams selected" : "Add Streams to unlock";
+  document.getElementById("reason-events").className = "calc-reason"+(hasStreams?"":" ");
+  document.getElementById("hint-events").style.display = hasStreams?"none":"block";
+
+  // Boost
+  const secBoost = document.getElementById("sec-boost");
+  secBoost.classList.toggle("disabled", !hasBoost);
+  document.getElementById("reason-boost").textContent = hasBoost ? "Unlocked — Audience Boost selected" : "Add Audience Boost to unlock";
+  document.getElementById("hint-boost").style.display = hasBoost?"none":"block";
+
+  // Orchestrations
+  const secOrch = document.getElementById("sec-orch");
+  secOrch.classList.toggle("disabled", !hasOrch);
+  document.getElementById("reason-orch").textContent = hasOrch ? "Unlocked — Orchestrations selected" : "Add Orchestrations to unlock";
+  document.getElementById("hint-orch").style.display = hasOrch?"none":"block";
+
+  // Show/hide metrics rows that only matter with streams
+  const kvMin = document.getElementById("kv-min-instances");
+  const kvPeak = document.getElementById("kv-peak-instances");
+  const kvEgress = document.getElementById("kv-egress");
+  [kvMin,kvPeak,kvEgress].forEach(el=>el.classList.toggle("dim",!hasStreams&&!hasOrch));
+}
+
+// ─── CALCULATOR ──────────────────────────────────────────────────────────────
+const SECS_PER_MONTH = 60*60*24*30;
+const PEAK_FRAC = 0.05;
+const BURST_SECS = SECS_PER_MONTH * PEAK_FRAC;
+
+function fmtC(v){ if(!isFinite(v))return"$0"; if(v>=1000)return"$"+Math.round(v).toLocaleString(); if(v>=1)return"$"+v.toFixed(2); return"$"+v.toFixed(4); }
+function fmtN(v){ if(v>=1e9)return(v/1e9).toFixed(2)+"B"; if(v>=1e6)return(v/1e6).toFixed(2)+"M"; if(v>=1e3)return(v/1e3).toFixed(1)+"K"; return Math.round(v).toLocaleString(); }
+function fmtD(s){ if(s<60)return s.toFixed(1)+"s"; if(s<3600)return(s/60).toFixed(1)+"m"; return(s/3600).toFixed(2)+"h"; }
+function fmtB(gb){ if(gb>=1024)return(gb/1024).toFixed(2)+" TB"; if(gb>=1)return gb.toFixed(2)+" GB"; return(gb*1024).toFixed(1)+" MB"; }
+
+function getV(id,fb){ const el=document.getElementById(id+"-num")||document.getElementById(id); return el?(+el.value||fb):fb; }
+
+const ADV_DEFAULTS = {
+  r_job_vcpu:0.000024, r_job_mem:0.0000025, r_job_cpu_count:2, r_job_mem_count:4,
+  r_job_query_sec:300, r_job_upload_rps:2000, r_job_overhead_sec:120,
+  r_svc_vcpu_on:0.000018, r_svc_mem_on:0.000002, r_svc_rpm_per_instance:3000,
+  r_svc_instance_vcpu:1, r_svc_instance_mem:1, r_svc_request_cost:0.40, r_svc_burst_factor:1.25,
+  r_wp_ms_cpu_per_event:3, r_wp_ms_mem_per_event:3, r_wp_fwd_ms_cpu:2, r_wp_fwd_ms_mem:1.5,
+  r_wp_vcpu:0.000024, r_wp_mem:0.0000025,
+  r_fwd_pct:25, r_fwd_fanout:1.5, r_egress_kb_per_event:1.2, r_egress_per_gb:0.12,
+  r_bt_lookups_per_profile:1.5, r_bt_node_hr:0.65, r_bt_node_rps:10000, r_bt_min_nodes:1,
+  r_bt_storage_gb:50, r_bt_storage_cost:0.17, r_bt_extra_upload_sec:30,
+  r_base_monthly:450, r_margin:15,
+};
+
+function readAdv() {
+  const r = {};
+  Object.keys(ADV_DEFAULTS).forEach(k => {
+    const el = document.getElementById(k);
+    r[k] = el ? (+el.value || ADV_DEFAULTS[k]) : ADV_DEFAULTS[k];
+  });
+  return r;
+}
+
+document.getElementById("advResetBtn").addEventListener("click", () => {
+  Object.entries(ADV_DEFAULTS).forEach(([k,v]) => {
+    const el = document.getElementById(k); if(el) el.value = v;
+  });
+  calcAndRender();
+});
+
+document.querySelectorAll(".adv-field input").forEach(el => {
+  el.addEventListener("input", calcAndRender);
+  el.addEventListener("change", calcAndRender);
+});
+
+function compute() {
+  const R = readAdv();
+  const hasStreams = state.has("streams");
+  const hasBoost = state.has("audience_boost");
+  const hasOrch = state.has("orchestrations");
+
+  const numSyncs    = getV("numSyncs",10);
+  const syncFreq    = getV("syncFreq",6);
+  const profiles    = getV("profiles",10000000);
+  const eppd        = getV("eventsPerProfile",5);
+  const avgRpm      = hasStreams ? getV("avgRpm",100) : 0;
+  const peakRpm     = hasStreams ? getV("peakRpm",500) : 0;
+  const boostSyncs  = hasBoost ? Math.min(getV("boostSyncs",0), numSyncs) : 0;
+  const boostAudPct = hasBoost ? getV("boostAudiencePct",20) : 0;
+  const orchFwdPct  = hasOrch ? getV("orchFwdPct",25) : 0;
+  const orchFanout  = hasOrch ? getV("orchFanout",1.5) : 0;
+
+  const eventsPerDay   = profiles * eppd;
+  const eventsPerMonth = eventsPerDay * 30;
+  const syncInvocations = numSyncs * syncFreq * 30;
+  const eventsPerSync   = syncInvocations > 0 ? eventsPerMonth / syncInvocations : 0;
+  const ingestionReqsMo = avgRpm * 60 * 24 * 30;
+
+  // Sync job cost
+  const uploadTimeSec   = R.r_job_upload_rps > 0 ? eventsPerSync / R.r_job_upload_rps : 0;
+  const syncDurationSec = R.r_job_overhead_sec + R.r_job_query_sec + uploadTimeSec;
+  const jobCostRate     = R.r_job_cpu_count * R.r_job_vcpu + R.r_job_mem_count * R.r_job_mem;
+
+  // Always-on events ingestion API
+  const sustainedRpm  = Math.max(1, R.r_svc_rpm_per_instance);
+  const minInstances  = hasStreams ? Math.max(1, Math.ceil((avgRpm * R.r_svc_burst_factor) / sustainedRpm)) : 0;
+  const peakInstances = hasStreams ? Math.max(minInstances, Math.ceil(peakRpm / sustainedRpm)) : 0;
+  const alwaysOnRate  = R.r_svc_instance_vcpu * R.r_svc_vcpu_on + R.r_svc_instance_mem * R.r_svc_mem_on;
+  const alwaysOnCost  = hasStreams ? minInstances * SECS_PER_MONTH * alwaysOnRate : 0;
+  const burstCost     = hasStreams ? Math.max(0, peakInstances - minInstances) * BURST_SECS * alwaysOnRate : 0;
+  const requestCost   = hasStreams ? (ingestionReqsMo / 1e6) * R.r_svc_request_cost : 0;
+  const ingestionApiCost = alwaysOnCost + burstCost + requestCost;
+
+  // Worker pool
+  const fwdPct = hasOrch ? orchFwdPct/100 : (hasStreams ? R.r_fwd_pct/100 : 0);
+  const fanout = hasOrch ? orchFanout     : (hasStreams ? R.r_fwd_fanout  : 0);
+  const forwardedEvents = eventsPerMonth * fwdPct * fanout;
+  const baseVcpuSec = eventsPerMonth  * R.r_wp_ms_cpu_per_event / 1000;
+  const baseMemSec  = eventsPerMonth  * R.r_wp_ms_mem_per_event / 1000;
+  const fwdVcpuSec  = forwardedEvents * R.r_wp_fwd_ms_cpu / 1000;
+  const fwdMemSec   = forwardedEvents * R.r_wp_fwd_ms_mem / 1000;
+  const workerPoolCost = (baseVcpuSec + fwdVcpuSec) * R.r_wp_vcpu + (baseMemSec + fwdMemSec) * R.r_wp_mem;
+
+  // Egress
+  const egressGB   = (forwardedEvents * R.r_egress_kb_per_event) / (1024 * 1024);
+  const egressCost = egressGB * R.r_egress_per_gb;
+
+  // Audience Boost — Bigtable
+  const boostInvocations = boostSyncs * syncFreq * 30;
+  const audiencePerSync  = profiles * (boostAudPct / 100);
+  const btReadsPerRun    = audiencePerSync * R.r_bt_lookups_per_profile;
+  const btMinNodes       = boostSyncs > 0 ? Math.max(1, R.r_bt_min_nodes) : 0;
+  const targetBtSec      = R.r_job_upload_rps > 0 ? Math.max(60, audiencePerSync / R.r_job_upload_rps) : 60;
+  const btPeakNodes      = boostSyncs > 0 ? Math.max(btMinNodes, Math.ceil(btReadsPerRun / (targetBtSec * R.r_bt_node_rps))) : 0;
+  const btThroughput     = btPeakNodes * R.r_bt_node_rps;
+  const btLookupTimeSec  = btThroughput > 0 ? btReadsPerRun / btThroughput : 0;
+  const boostedSyncDurSec = syncDurationSec + btLookupTimeSec + R.r_bt_extra_upload_sec;
+  const HOURS_PER_MONTH  = 730;
+  const btBaseNodeCost   = btMinNodes * HOURS_PER_MONTH * R.r_bt_node_hr;
+  const btBurstNodes     = Math.max(0, btPeakNodes - btMinNodes);
+  const btBurstHours     = boostInvocations > 0 ? boostInvocations * boostedSyncDurSec / 3600 : 0;
+  const btBurstNodeCost  = btBurstNodes * btBurstHours * R.r_bt_node_hr;
+  const btStorageCost    = boostSyncs > 0 ? R.r_bt_storage_gb * R.r_bt_storage_cost : 0;
+  const boostCost        = boostSyncs > 0 ? btBaseNodeCost + btBurstNodeCost + btStorageCost : 0;
+
+  // Boosted syncs run longer
+  const regularInvocations = syncInvocations - boostInvocations;
+  const totalSyncJobCost   = (regularInvocations * syncDurationSec + boostInvocations * boostedSyncDurSec) * jobCostRate;
+
+  const components = [
+    { name:"Cloud Run Jobs (syncs)",           cost:totalSyncJobCost,  color:"#6366F1", active:true,             detail:`${fmtN(syncInvocations)} invocations · ${fmtD(syncDurationSec)} avg${boostSyncs>0?' (incl. boosted)':''}` },
+    { name:"Events Ingestion API (always-on)", cost:ingestionApiCost,  color:"#8B5CF6", active:hasStreams,        detail:hasStreams?`${minInstances}–${peakInstances} instances · ${fmtN(ingestionReqsMo)} req/mo`:"Not in package" },
+    { name:"Worker Pool (proc + forwarding)",  cost:workerPoolCost,    color:"#3B82F6", active:hasStreams||hasOrch, detail:(hasStreams||hasOrch)?`${fmtN(eventsPerMonth)} events · ${fmtN(forwardedEvents)} forwarded (${(fwdPct*100).toFixed(0)}% × ${fanout} fan-out)`:"Not in package" },
+    { name:"Audience Boost (Bigtable)",        cost:boostCost,         color:"#F59E0B", active:hasBoost,          detail:hasBoost&&boostSyncs>0?`${btMinNodes} base + ${btBurstNodes} burst node(s) · ${fmtN(audiencePerSync)} profiles/sync · ${fmtD(btLookupTimeSec)} lookup/run`:"Not in package — or set boost syncs > 0" },
+    { name:"Network Egress",                   cost:egressCost,        color:"#22D3EE", active:hasStreams||hasOrch, detail:(hasStreams||hasOrch)?`${fmtB(egressGB)} from ${fmtN(forwardedEvents)} forwarded events`:"Not in package" },
+    { name:"Base Platform",                    cost:R.r_base_monthly,  color:"#94A3B8", active:true,             detail:"DB, cache, monitoring, LB base" },
+  ];
+
+  const subtotal = components.reduce((s,c) => s + c.cost, 0);
+  const margin   = subtotal * (R.r_margin / 100);
+  const total    = subtotal + margin;
+  const marginPct = R.r_margin;
+
+  return { components, subtotal, margin, total, marginPct, eventsPerMonth, syncInvocations, syncDurationSec, minInstances, peakInstances, ingestionReqsMo, egressGB, profiles, avgRpm, peakRpm };
+}
+
+function calcAndRender() {
+  const r = compute();
+
+  // Update display values for sliders
+  document.getElementById("numSyncs-val").textContent = getV("numSyncs",10).toLocaleString();
+  document.getElementById("syncFreq-val").textContent = getV("syncFreq",6).toLocaleString();
+  document.getElementById("profiles-val").textContent = fmtN(getV("profiles",10000000));
+  document.getElementById("eventsPerProfile-val").textContent = getV("eventsPerProfile",5);
+  document.getElementById("avgRpm-val").textContent = getV("avgRpm",100).toLocaleString();
+  document.getElementById("peakRpm-val").textContent = getV("peakRpm",500).toLocaleString();
+  document.getElementById("boostSyncs-val").textContent = getV("boostSyncs",0).toLocaleString();
+  document.getElementById("boostAudiencePct-val").textContent = getV("boostAudiencePct",20)+"%";
+  document.getElementById("orchFwdPct-val").textContent = getV("orchFwdPct",25)+"%";
+  document.getElementById("orchFanout-val").textContent = getV("orchFanout",1.5);
+
+  document.getElementById("totalMonthly").textContent = fmtC(r.total);
+  document.getElementById("totalAnnual").textContent = fmtC(r.total*12);
+  const pp = r.profiles>0?r.total/r.profiles:0;
+  const pm = r.eventsPerMonth>0?(r.total/r.eventsPerMonth)*1e6:0;
+  document.getElementById("perProfile").textContent = "$"+pp.toFixed(4);
+  document.getElementById("perMillion").textContent = "$"+pm.toFixed(2);
+
+  const tbody = document.getElementById("breakdownBody");
+  tbody.innerHTML = "";
+  const bar = document.getElementById("stackedBar");
+  bar.innerHTML = "";
+  const activeCost = r.components.filter(c=>c.active).reduce((s,c)=>s+c.cost,0);
+  r.components.forEach(c=>{
+    const pct = r.subtotal>0?(c.cost/r.subtotal)*100:0;
+    const tr = document.createElement("tr");
+    if(!c.active) tr.className = "disabled-row";
+    tr.innerHTML = `<td><div class="name"><span class="swatch" style="background:${c.color}"></span>${c.name}${!c.active?'<span style="font-size:11px;color:#949DB5;margin-left:6px;">(not in package)</span>':''}</div><div class="detail">${c.detail}</div></td><td class="cost">${c.active?fmtC(c.cost):"—"}</td><td class="pct">${c.active?pct.toFixed(1)+"%":"—"}</td>`;
+    tbody.appendChild(tr);
+    if(c.active&&r.subtotal>0){ const seg=document.createElement("div"); seg.style.cssText=`background:${c.color};width:${pct}%`; seg.title=`${c.name} — ${pct.toFixed(1)}%`; bar.appendChild(seg); }
+  });
+  document.getElementById("subtotalRow").textContent = fmtC(r.subtotal);
+  document.getElementById("marginRow").textContent = fmtC(r.margin);
+  document.getElementById("marginLabel").textContent = `Operational margin (${r.marginPct}%)`;
+  document.getElementById("totalRow").innerHTML = `<strong>${fmtC(r.total)}</strong>`;
+  document.getElementById("d_events_month").textContent = fmtN(r.eventsPerMonth);
+  document.getElementById("d_sync_invocations").textContent = r.syncInvocations.toLocaleString();
+  document.getElementById("d_sync_duration").textContent = fmtD(r.syncDurationSec);
+  document.getElementById("d_min_instances").textContent = state.has("streams")?r.minInstances:"N/A";
+  document.getElementById("d_peak_instances").textContent = state.has("streams")?r.peakInstances:"N/A";
+  document.getElementById("d_egress_month").textContent = (state.has("streams")||state.has("orchestrations"))?fmtB(r.egressGB):"N/A";
+}
+
+// ─── SLIDER BINDING ──────────────────────────────────────────────────────────
+function bindSlider(id) {
+  const range = document.getElementById(id);
+  const num   = document.getElementById(id+"-num");
+  if(!range||!num) return;
+  function sync(){ num.value=range.value; calcAndRender(); }
+  function syncN(){ if(+num.value>+range.max)range.max=num.value; range.value=num.value; document.querySelectorAll(".preset-btn").forEach(b=>b.classList.remove("active")); calcAndRender(); }
+  range.addEventListener("input",sync); range.addEventListener("change",sync);
+  num.addEventListener("input",syncN); num.addEventListener("change",syncN);
+}
+["numSyncs","syncFreq","profiles","eventsPerProfile","avgRpm","peakRpm","boostSyncs","boostAudiencePct","orchFwdPct","orchFanout"].forEach(bindSlider);
+
+// ─── PRESETS ─────────────────────────────────────────────────────────────────
+const presets = {
+  starter:    {numSyncs:3,  syncFreq:2,  profiles:500000,    eventsPerProfile:3,  avgRpm:20,   peakRpm:100,  boostSyncs:0,  boostAudiencePct:20, orchFwdPct:15, orchFanout:1.2},
+  growth:     {numSyncs:8,  syncFreq:6,  profiles:5000000,   eventsPerProfile:5,  avgRpm:80,   peakRpm:400,  boostSyncs:2,  boostAudiencePct:20, orchFwdPct:20, orchFanout:1.5},
+  scale:      {numSyncs:15, syncFreq:6,  profiles:25000000,  eventsPerProfile:5,  avgRpm:200,  peakRpm:1000, boostSyncs:5,  boostAudiencePct:15, orchFwdPct:25, orchFanout:1.5},
+  enterprise: {numSyncs:30, syncFreq:12, profiles:150000000, eventsPerProfile:8,  avgRpm:1000, peakRpm:5000, boostSyncs:10, boostAudiencePct:10, orchFwdPct:30, orchFanout:2.0},
+};
+document.querySelectorAll(".preset-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".preset-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    const p = presets[btn.dataset.preset];
+    if(!p) return;
+    Object.entries(p).forEach(([id,val])=>{
+      const num=document.getElementById(id+"-num"); const rng=document.getElementById(id);
+      if(num) num.value=val; if(rng){ if(val>+rng.max)rng.max=val; rng.value=val; }
+    });
+    calcAndRender();
+  });
+});
+
+// ─── MODAL ───────────────────────────────────────────────────────────────────
+function showModal(id) {
+  const f = ALL_FEATURES.find(x=>x.id===id); if(!f) return;
+  document.getElementById("modal-icon").innerHTML = ICONS[f.icon]||"";
+  document.getElementById("modal-title").textContent = f.name;
+  document.getElementById("modal-link").textContent = f.docs;
+  document.getElementById("modal-link").href = "https://"+f.docs;
+  document.getElementById("modal-desc").textContent = f.desc;
+  document.getElementById("modal-addon-pill").style.display = f.premium?"":"none";
+  document.getElementById("modal-usecases").innerHTML = f.useCases?`<div class="uc-label">Common Use Cases</div>${f.useCases.map(uc=>`<div class="uc-item"><span class="c-green">${ICONS.check}</span><span>${uc}</span></div>`).join("")}`:"";
+  document.getElementById("modal").style.display = "flex";
+}
+function closeModal(){ document.getElementById("modal").style.display="none"; }
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+renderCoreGrid();
+renderPreselected();
+renderGroups();
+updateSidebar();
+</script>
+</body>
+</html>
